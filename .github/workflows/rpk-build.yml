@@ -88,7 +88,7 @@ jobs:
         draft: true
         prerelease: false
     outputs:
-      urload_url: ${{ steps.create_rpk_release.outputs.upload_url }}
+      upload_url: ${{ steps.create_rpk_release.outputs.upload_url }}
 
   publish-release-artifacts:
     name: Publish release
@@ -99,6 +99,8 @@ jobs:
         os: [linux, darwin]
     runs-on: ubuntu-latest
     steps:
+    - run: echo ${{ needs.create-release.outputs.upload_url }}
+
     - name: Download compressed rpk artifacts 
       uses: actions/download-artifact@v2
 
