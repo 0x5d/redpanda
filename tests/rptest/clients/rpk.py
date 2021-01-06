@@ -32,6 +32,14 @@ class RpkTool:
     def __init__(self, redpanda):
         self._redpanda = redpanda
 
+    def start_container_cluster(self, nodes=3):
+        cmd = [
+            self._rpk_binary(), "container", "start",
+            "-n", nodes
+        ]
+        return self._execute(cmd)
+
+
     def create_topic(self, topic, partitions=1):
         cmd = ["topic", "create", topic]
         cmd += ["--partitions", str(partitions)]
