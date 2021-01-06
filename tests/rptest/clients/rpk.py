@@ -33,12 +33,38 @@ class RpkTool:
         self._redpanda = redpanda
 
     def start_container_cluster(self, nodes=3):
-        cmd = [
-            self._rpk_binary(), "container", "start",
-            "-n", nodes
-        ]
-        return self._execute(cmd)
+        class Broker():
+            def __init__(self, node_id, addr):
+                self.node_id = node_id
+                self.addr = addr
 
+        cmd = [
+            self._rpk_binary(),
+            'container',
+            'start',
+            '-n',
+            str(nodes),
+            '--network', 'rp',
+        ]
+
+        def parse_output(out):
+            ls = [l.strip() for l in out.splitlines()]
+            brokers = []
+            for l in ls:
+                m = re.match(r"(?P<node_id>\d+)\s+(?P<addr>.+)", l)
+                if m is not None:
+                    brokers.append(Broker(m.group('node_id'), m.group('addr')))
+            return brokers
+
+        return parse_output(self._execute(cmd))
+
+    def purge_container_cluster(self, nodes=3):
+        cmd = [self._rpk_binary(), 'container', 'purge']
+        return self._parse_container_stop_out(self._execute(cmd))
+
+    def stop_container_cluster(self, nodes=3):
+        cmd = [self._rpk_binary(), 'container', 'stop']
+        return self._parse_container_stop_out(self._execute(cmd))
 
     def create_topic(self, topic, partitions=1):
         cmd = ["topic", "create", topic]
@@ -140,8 +166,17 @@ class RpkTool:
             self._redpanda.logger.debug(output)
             return output
         except subprocess.CalledProcessError as e:
-            self._redpanda.logger.debug("Error (%d) executing command: %s",
-                                        e.returncode, e.output)
+            self._redpanda.logger.info("Error (%d) executing command: %s",
+                                       e.returncode, e.output)
 
     def _rpk_binary(self):
         return self._redpanda.find_binary("rpk")
+
+    def _parse_container_stop_out(self, out):
+        ls = [l.strip() for l in out.splitlines()]
+        ids = []
+        for l in ls:
+            m = re.match(r'Stopping node (?P<node_id>\d)', l)
+            if m is not None:
+                ids.append(m.group('node_id'))
+        return ids

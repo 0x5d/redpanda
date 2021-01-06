@@ -44,6 +44,11 @@ RUN mkdir -p "/opt/kafka-2.3.1" && chmod a+rw /opt/kafka-2.3.1 && curl -s "$KAFK
     cd /opt/librdkafka/tests && \
     make build -j$(nproc)
 
+RUN curl -fsSLO https://download.docker.com/linux/static/stable/x86_64/docker-20.10.1.tgz && \
+    tar xzvf docker-20.10.1.tgz --strip 1 -C /usr/local/bin docker/docker && \
+    rm docker-20.10.1.tgz && \
+    touch /var/run/docker.sock
+
 # install python dependencies
 COPY . /root/tests/
 RUN pip3 install --no-cache-dir --upgrade pip wheel setuptools && \
