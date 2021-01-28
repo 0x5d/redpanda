@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"os"
 	fp "path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -374,7 +375,10 @@ func recover(fs afero.Fs, backup, path string, err error) error {
 func unmarshal(v *viper.Viper) (*Config, error) {
 	result := &Config{}
 	decoderConfig := mapstructure.DecoderConfig{
-		Result: result,
+		Result:	result,
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			v21_1_4MapToSocketAddressSlice,
+		),
 	}
 	decoder, err := mapstructure.NewDecoder(&decoderConfig)
 	if err != nil {
@@ -389,6 +393,26 @@ func unmarshal(v *viper.Viper) (*Config, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// Redpanda version < 21.1.4 only supported a single listener and a single
+// advertised address. This custom decode function translates a single
+// SocketAddress map into a []SocketAddress
+func v21_1_4MapToSocketAddressSlice(
+	from, to reflect.Type, data interface{},
+) (interface{}, error) {
+	if to == reflect.TypeOf([]SocketAddress{}) {
+		switch from.Kind() {
+		case reflect.Map:
+			sa := SocketAddress{}
+			err := mapstructure.Decode(data, &sa)
+			if err != nil {
+				return nil, err
+			}
+			return []SocketAddress{sa}, nil
+		}
+	}
+	return data, nil
 }
 
 func base58Encode(s string) string {
