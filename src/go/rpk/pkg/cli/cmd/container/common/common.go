@@ -36,7 +36,7 @@ var (
 )
 
 const (
-	redpandaNetwork	= "redpanda"
+	RedpandaNetwork	= "redpanda"
 
 	defaultDockerClientTimeout	= 10 * time.Second
 )
@@ -109,7 +109,7 @@ func GetState(c Client, nodeID uint) (*NodeState, error) {
 		return nil, err
 	}
 	var ipAddress string
-	network, exists := containerJSON.NetworkSettings.Networks[redpandaNetwork]
+	network, exists := containerJSON.NetworkSettings.Networks[RedpandaNetwork]
 	if exists {
 		ipAddress = network.IPAMConfig.IPv4Address
 	}
@@ -145,7 +145,7 @@ func CreateNetwork(c Client) (string, error) {
 	ctx, _ := DefaultCtx()
 
 	args := filters.NewArgs()
-	args.Add("name", redpandaNetwork)
+	args.Add("name", RedpandaNetwork)
 	networks, err := c.NetworkList(
 		ctx,
 		types.NetworkListOptions{Filters: args},
@@ -155,17 +155,17 @@ func CreateNetwork(c Client) (string, error) {
 	}
 
 	for _, net := range networks {
-		if net.Name == redpandaNetwork {
+		if net.Name == RedpandaNetwork {
 			return net.ID, nil
 		}
 	}
 
 	log.Debugf(
 		"Docker network '%s' doesn't exist, creating.",
-		redpandaNetwork,
+		RedpandaNetwork,
 	)
 	resp, err := c.NetworkCreate(
-		ctx, redpandaNetwork, types.NetworkCreate{
+		ctx, RedpandaNetwork, types.NetworkCreate{
 			Driver:	"bridge",
 			IPAM: &network.IPAM{
 				Driver:	"default",
@@ -190,7 +190,7 @@ func CreateNetwork(c Client) (string, error) {
 // Delete the Redpanda network if it exists.
 func RemoveNetwork(c Client) error {
 	ctx, _ := DefaultCtx()
-	err := c.NetworkRemove(ctx, redpandaNetwork)
+	err := c.NetworkRemove(ctx, RedpandaNetwork)
 	if c.IsErrNotFound(err) {
 		return nil
 	}
@@ -271,7 +271,7 @@ func CreateNode(
 	}
 	networkConfig := network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			redpandaNetwork: {
+			RedpandaNetwork: {
 				IPAMConfig: &network.EndpointIPAMConfig{
 					IPv4Address: ip,
 				},
