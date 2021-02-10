@@ -57,6 +57,7 @@ func Start() *cobra.Command {
 			return common.WrapIfConnErr(startCluster(
 				c,
 				nodes,
+				network,
 				checkBrokers,
 				retries,
 			))
@@ -90,7 +91,11 @@ func Start() *cobra.Command {
 }
 
 func startCluster(
-	c common.Client, n uint, check func([]node) func() error, retries uint,
+	c common.Client,
+	n uint,
+	network string,
+	check func([]node) func() error,
+	retries uint,
 ) error {
 	// Check if cluster exists and start it again.
 	restarted, err := restartCluster(c, check, retries)
@@ -132,9 +137,8 @@ func startCluster(
 			return errors.New(msg)
 		}
 	}
-
 	// Create the docker network if it doesn't exist already
-	netID, err := common.CreateNetwork(c)
+	netID, err := common.CreateNetwork(c, network)
 	if err != nil {
 		return err
 	}

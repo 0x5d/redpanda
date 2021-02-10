@@ -141,11 +141,11 @@ func GetState(c Client, nodeID uint) (*NodeState, error) {
 
 // Creates a network for the cluster's containers and returns its ID. If it
 // exists already, it returns the existing network's ID.
-func CreateNetwork(c Client) (string, error) {
+func CreateNetwork(c Client, networkName string) (string, error) {
 	ctx, _ := DefaultCtx()
 
 	args := filters.NewArgs()
-	args.Add("name", RedpandaNetwork)
+	args.Add("name", networkName)
 	networks, err := c.NetworkList(
 		ctx,
 		types.NetworkListOptions{Filters: args},
