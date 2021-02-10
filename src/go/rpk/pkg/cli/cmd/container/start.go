@@ -37,6 +37,7 @@ func Start() *cobra.Command {
 	var (
 		nodes	uint
 		retries	uint
+		network	string
 	)
 	command := &cobra.Command{
 		Use:	"start",
@@ -77,7 +78,14 @@ func Start() *cobra.Command {
 		"The amount of times to check for the cluster before"+
 			" considering it unstable and exiting.",
 	)
-
+	networkFlag := "network"
+	command.Flags().StringVar(
+		&network,
+		networkFlag,
+		common.RedpandaNetwork,
+		"The name of the network to launch the containers into.",
+	)
+	command.Flags().MarkHidden(networkFlag)
 	return command
 }
 
