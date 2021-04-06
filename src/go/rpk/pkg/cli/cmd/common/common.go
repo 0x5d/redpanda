@@ -27,6 +27,12 @@ import (
 const FeedbackMsg = `We'd love to hear about your experience with redpanda:
 https://vectorized.io/feedback`
 
+const (
+	certFileFlag       = "tls-cert"
+	keyFileFlag        = "tls-key"
+	truststoreFileFlag = "tls-truststore"
+)
+
 func Deprecated(newCmd *cobra.Command, newUse string) *cobra.Command {
 	newCmd.Deprecated = deprecationMessage(newUse)
 	newCmd.Hidden = true
@@ -246,7 +252,12 @@ func ContainerBrokers(c common.Client) ([]string, []string) {
 }
 
 func AddKafkaFlags(
-	command *cobra.Command, configFile *string, brokers *[]string,
+	command *cobra.Command,
+	brokers *[]string,
+	configFile,
+	certFile,
+	keyFile,
+	truststoreFile *string,
 ) *cobra.Command {
 	command.Flags().StringSliceVar(
 		brokers,
@@ -260,6 +271,36 @@ func AddKafkaFlags(
 		"",
 		"Redpanda config file, if not set the file will be searched for"+
 			" in the default locations",
+	)
+
+	AddKafkaTLSFlags(command, certFile, keyFile, truststoreFile)
+
+	return command
+}
+
+func AddKafkaTLSFlags(
+	command *cobra.Command,
+	certFile,
+	keyFile,
+	truststoreFile *string,
+) *cobra.Command {
+	command.PersistentFlags().StringVar(
+		certFile,
+		certFileFlag,
+		"",
+		"The certificate to be used for TLS authentication with the broker.",
+	)
+	command.PersistentFlags().StringVar(
+		keyFile,
+		keyFileFlag,
+		"",
+		"The certificate key to be used for TLS authentication with the broker.",
+	)
+	command.PersistentFlags().StringVar(
+		truststoreFile,
+		truststoreFileFlag,
+		"",
+		"The truststore to be used for TLS communication with the broker.",
 	)
 
 	return command

@@ -19,8 +19,11 @@ import (
 
 func NewWasmCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 	var (
-		configFile string
-		brokers    []string
+		brokers        []string
+		configFile     string
+		certFile       string
+		keyFile        string
+		truststoreFile string
 	)
 
 	command := &cobra.Command{
@@ -43,16 +46,22 @@ func NewWasmCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 	command.AddCommand(
 		common.AddKafkaFlags(
 			wasm.NewDeployCommand(fs, producerClosure, adminClosure),
-			&configFile,
 			&brokers,
+			&configFile,
+			&certFile,
+			&keyFile,
+			&truststoreFile,
 		),
 	)
 
 	command.AddCommand(
 		common.AddKafkaFlags(
 			wasm.NewRemoveCommand(producerClosure, adminClosure),
-			&configFile,
 			&brokers,
+			&configFile,
+			&certFile,
+			&keyFile,
+			&truststoreFile,
 		),
 	)
 
