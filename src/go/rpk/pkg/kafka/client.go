@@ -46,9 +46,9 @@ func DefaultConfig() *sarama.Config {
 }
 
 // Overrides the default config with the redpanda config values, such as TLS.
-func LoadConfig(conf *config.Config) (*sarama.Config, error) {
+func LoadConfig(tlsConfig *config.TLS) (*sarama.Config, error) {
 	c := DefaultConfig()
-	return configureTLS(c, conf)
+	return configureTLS(c, tlsConfig)
 }
 
 func InitClient(brokers ...string) (sarama.Client, error) {
@@ -58,9 +58,9 @@ func InitClient(brokers ...string) (sarama.Client, error) {
 
 // Initializes a client using values from the configuration when possible.
 func InitClientWithConf(
-	conf *config.Config, brokers ...string,
+	tlsConfig *config.TLS, brokers ...string,
 ) (sarama.Client, error) {
-	c, err := LoadConfig(conf)
+	c, err := LoadConfig(tlsConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -175,23 +175,22 @@ func RetrySend(
 // redpanda.kafka_api_tls are set in the configuration. Doesn't modify the
 // configuration otherwise.
 func configureTLS(
-	saramaConf *sarama.Config, rpConf *config.Config,
+	saramaConf *sarama.Config, tlsConfig *config.TLS,
 ) (*sarama.Config, error) {
 	var tlsConf *tls.Config
 	var err error
-	rpkTls := rpConf.Rpk.TLS
 
 	// Try to configure TLS from the available config
 	switch {
 	// Enable client auth if the cert & key files are set for rpk
-	case rpkTls.CertFile != "" &&
-		rpkTls.KeyFile != "" &&
-		rpkTls.TruststoreFile != "":
+	case tlsConfig.CertFile != "" &&
+		tlsConfig.KeyFile != "" &&
+		tlsConfig.TruststoreFile != "":
 
 		tlsConf, err = loadTLSConfig(
-			rpkTls.TruststoreFile,
-			rpkTls.CertFile,
-			rpkTls.KeyFile,
+			tlsConfig.TruststoreFile,
+			tlsConfig.CertFile,
+			tlsConfig.KeyFile,
 		)
 		if err != nil {
 			return nil, err
@@ -199,8 +198,8 @@ func configureTLS(
 		log.Debug("API TLS auth enabled using rpk.tls")
 
 	// Enable TLS (no auth) if only the CA cert file is set for rpk
-	case rpkTls.TruststoreFile != "":
-		caCertPool, err := loadRootCACert(rpkTls.TruststoreFile)
+	case tlsConfig.TruststoreFile != "":
+		caCertPool, err := loadRootCACert(tlsConfig.TruststoreFile)
 		if err != nil {
 			return nil, err
 		}

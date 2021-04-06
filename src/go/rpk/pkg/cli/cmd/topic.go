@@ -61,9 +61,10 @@ func NewTopicCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		configClosure,
 		&brokers,
 	)
-	adminClosure := common.CreateAdmin(fs, brokersClosure, configClosure)
-	clientClosure := common.CreateClient(fs, brokersClosure, configClosure)
-	producerClosure := common.CreateProducer(brokersClosure, configClosure)
+	tlsConfigClosure := common.BuildTLSConfig(&certFile, &keyFile, &truststoreFile)
+	adminClosure := common.CreateAdmin(fs, brokersClosure, tlsConfigClosure, configClosure)
+	clientClosure := common.CreateClient(fs, brokersClosure, tlsConfigClosure, configClosure)
+	producerClosure := common.CreateProducer(brokersClosure, tlsConfigClosure, configClosure)
 
 	command.AddCommand(topic.NewCreateCommand(adminClosure))
 	command.AddCommand(topic.NewDeleteCommand(adminClosure))

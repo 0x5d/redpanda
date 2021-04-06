@@ -165,14 +165,25 @@ func DeduceBrokers(
 }
 
 func CreateProducer(
-	brokers func() []string, configuration func() (*config.Config, error),
+	brokers func() []string,
+	tlsConfig func() (*config.TLS, error),
+	configuration func() (*config.Config, error),
 ) func(bool, int32) (sarama.SyncProducer, error) {
 	return func(jvmPartitioner bool, partition int32) (sarama.SyncProducer, error) {
-		conf, err := configuration()
+		tls, err := tlsConfig()
 		if err != nil {
 			return nil, err
 		}
-		cfg, err := kafka.LoadConfig(conf)
+		// If no TLS config was set, try to look for TLS config in the
+		// config file.
+		if tls == nil {
+			conf, err := configuration()
+			if err != nil {
+				return nil, err
+			}
+			tls = &conf.Rpk.TLS
+		}
+		cfg, err := kafka.LoadConfig(tls)
 		if err != nil {
 			return nil, err
 		}
@@ -191,15 +202,24 @@ func CreateProducer(
 func CreateClient(
 	fs afero.Fs,
 	brokers func() []string,
+	tlsConfig func() (*config.TLS, error),
 	configuration func() (*config.Config, error),
 ) func() (sarama.Client, error) {
 	return func() (sarama.Client, error) {
+		bs := brokers()
+		tls, err := tlsConfig()
+		if err != nil {
+			return nil, err
+		}
+		if tls != nil {
+			client, err := kafka.InitClientWithConf(tls, bs...)
+			return client, wrapConnErr(err, bs)
+		}
 		conf, err := configuration()
 		if err != nil {
 			return nil, err
 		}
-		bs := brokers()
-		client, err := kafka.InitClientWithConf(conf, bs...)
+		client, err := kafka.InitClientWithConf(&conf.Rpk.TLS, bs...)
 		return client, wrapConnErr(err, bs)
 	}
 }
@@ -207,14 +227,24 @@ func CreateClient(
 func CreateAdmin(
 	fs afero.Fs,
 	brokers func() []string,
+	tlsConfig func() (*config.TLS, error),
 	configuration func() (*config.Config, error),
 ) func() (sarama.ClusterAdmin, error) {
 	return func() (sarama.ClusterAdmin, error) {
-		conf, err := configuration()
+		tls, err := tlsConfig()
 		if err != nil {
 			return nil, err
 		}
-		cfg, err := kafka.LoadConfig(conf)
+		// If no TLS config was set, try to look for TLS config in the
+		// config file.
+		if tls == nil {
+			conf, err := configuration()
+			if err != nil {
+				return nil, err
+			}
+			tls = &conf.Rpk.TLS
+		}
+		cfg, err := kafka.LoadConfig(tls)
 		if err != nil {
 			return nil, err
 		}
@@ -249,6 +279,46 @@ func ContainerBrokers(c common.Client) ([]string, []string) {
 		addrs = append(addrs, addr)
 	}
 	return addrs, stopped
+}
+
+func BuildTLSConfig(
+	certFile,
+	keyFile,
+	truststoreFile *string,
+) func() (*config.TLS, error) {
+	return func() (*config.TLS, error) {
+		if *truststoreFile == "" && *certFile == "" && *keyFile == "" {
+			return nil, nil
+		}
+		if *truststoreFile == "" && (*certFile != "" || *keyFile != "") {
+			return nil, fmt.Errorf(
+				"--%s is required to enable TLS",
+				truststoreFileFlag,
+			)
+		}
+		if *certFile != "" && *keyFile == "" {
+			return nil, fmt.Errorf(
+				"if --%s is passed, then --%s must be passed too to enable"+
+					" TLS authentication",
+				certFileFlag,
+				keyFileFlag,
+			)
+		}
+		if *keyFile != "" && *certFile == "" {
+			return nil, fmt.Errorf(
+				"if --%s is passed, then --%s must be passed to enable"+
+					" TLS authentication",
+				keyFileFlag,
+				certFileFlag,
+			)
+		}
+		tls := &config.TLS{
+			KeyFile:        *keyFile,
+			CertFile:       *certFile,
+			TruststoreFile: *truststoreFile,
+		}
+		return tls, nil
+	}
 }
 
 func AddKafkaFlags(

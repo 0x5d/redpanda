@@ -40,8 +40,9 @@ func NewWasmCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		configClosure,
 		&brokers,
 	)
-	producerClosure := common.CreateProducer(brokersClosure, configClosure)
-	adminClosure := common.CreateAdmin(fs, brokersClosure, configClosure)
+	tlsConfigClosure := common.BuildTLSConfig(&certFile, &keyFile, &truststoreFile)
+	adminClosure := common.CreateAdmin(fs, brokersClosure, tlsConfigClosure, configClosure)
+	producerClosure := common.CreateProducer(brokersClosure, tlsConfigClosure, configClosure)
 
 	command.AddCommand(
 		common.AddKafkaFlags(

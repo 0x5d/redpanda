@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/api"
+	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cli/cmd/common"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cli/cmd/version"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cli/ui"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cloud"
@@ -43,9 +44,12 @@ type kafkaInfo struct {
 
 func NewInfoCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 	var (
-		configFile string
-		send       bool
-		timeout    time.Duration
+		configFile     string
+		send           bool
+		timeout        time.Duration
+		certFile       string
+		keyFile        string
+		truststoreFile string
 	)
 	command := &cobra.Command{
 		Use:          "info",
@@ -53,7 +57,19 @@ func NewInfoCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		Aliases:      []string{"status"},
 		SilenceUsage: true,
 		RunE: func(ccmd *cobra.Command, args []string) error {
-			return executeInfo(fs, mgr, configFile, timeout, send)
+			tlsConfigClosure := common.BuildTLSConfig(
+				&certFile,
+				&keyFile,
+				&truststoreFile,
+			)
+			return executeInfo(
+				fs,
+				mgr,
+				configFile,
+				tlsConfigClosure,
+				timeout,
+				send,
+			)
 		},
 	}
 	command.Flags().StringVar(
@@ -77,6 +93,12 @@ func NewInfoCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 			"fraction and a unit suffix, such as '300ms', '1.5s' or '2h45m'. "+
 			"Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'",
 	)
+	common.AddKafkaTLSFlags(
+		command,
+		&certFile,
+		&keyFile,
+		&truststoreFile,
+	)
 	return command
 }
 
@@ -84,6 +106,7 @@ func executeInfo(
 	fs afero.Fs,
 	mgr config.Manager,
 	configFile string,
+	tlsConfig func() (*config.TLS, error),
 	timeout time.Duration,
 	send bool,
 ) error {
@@ -107,7 +130,7 @@ func executeInfo(
 	metricsRes, err := getMetrics(fs, mgr, timeout, *conf)
 
 	go func() {
-		err := getKafkaInfo(*conf, kafkaRowsCh, kafkaInfoCh, send)
+		err := getKafkaInfo(*conf, tlsConfig, kafkaRowsCh, kafkaInfoCh, send)
 		log.Debug(err)
 	}()
 	if err != nil {
@@ -261,6 +284,7 @@ func getConf(
 
 func getKafkaInfo(
 	conf config.Config,
+	tlsConfig func() (*config.TLS, error),
 	out chan<- [][]string,
 	kafkaInfoCh chan<- kafkaInfo,
 	send bool,
@@ -276,7 +300,16 @@ func getKafkaInfo(
 		conf.Redpanda.KafkaApi[0].Address,
 		conf.Redpanda.KafkaApi[0].Port,
 	)
-	client, err := kafka.InitClientWithConf(&conf, addr)
+	tls, err := tlsConfig()
+	if err != nil {
+		out <- [][]string{}
+		kafkaInfoCh <- kInfo
+		return err
+	}
+	if err == nil {
+		tls = &conf.Rpk.TLS
+	}
+	client, err := kafka.InitClientWithConf(tls, addr)
 	if err != nil {
 		out <- [][]string{}
 		kafkaInfoCh <- kInfo
