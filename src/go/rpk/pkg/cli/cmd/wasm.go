@@ -41,7 +41,7 @@ func NewWasmCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 	adminClosure := common.CreateAdmin(fs, brokersClosure, configClosure)
 
 	command.AddCommand(
-		addKafkaFlags(
+		common.AddKafkaFlags(
 			wasm.NewDeployCommand(fs, producerClosure, adminClosure),
 			&configFile,
 			&brokers,
@@ -49,33 +49,12 @@ func NewWasmCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 	)
 
 	command.AddCommand(
-		addKafkaFlags(
+		common.AddKafkaFlags(
 			wasm.NewRemoveCommand(producerClosure, adminClosure),
 			&configFile,
 			&brokers,
 		),
 	)
 
-	return command
-}
-
-func addKafkaFlags(
-	command *cobra.Command, configFile *string, brokers *[]string,
-) *cobra.Command {
-
-	command.Flags().StringSliceVar(
-		brokers,
-		"brokers",
-		[]string{},
-		"Comma-separated list of broker ip:port pairs",
-	)
-
-	command.Flags().StringVar(
-		configFile,
-		"config",
-		"",
-		"Redpanda config file, if not set the file will be searched for"+
-			" in the default locations",
-	)
 	return command
 }
