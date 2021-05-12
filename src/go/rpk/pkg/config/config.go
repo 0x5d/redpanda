@@ -73,44 +73,52 @@ func setDefaults(v *viper.Viper) {
 }
 
 func Default() *Config {
-	conf := &Config{}
-	err := mapstructure.Decode(defaultMap(), conf)
-	if err != nil {
-		panic(err)
+	defaultListener := NamedSocketAddress{
+		SocketAddress: SocketAddress{
+			Address: "0.0.0.0",
+			Port:    9092,
+		},
+	}
+	defaultListeners := []NamedSocketAddress{defaultListener}
+	defaultAdminListener := NamedSocketAddress{
+		SocketAddress: SocketAddress{
+			Address: "0.0.0.0",
+			Port:    9644,
+		},
+	}
+	defaultAdminListeners := []NamedSocketAddress{defaultAdminListener}
+	conf := &Config{
+		ConfigFile: "/etc/redpanda/redpanda.yaml",
+		Pandaproxy: &Pandaproxy{
+			PandaproxyAPI:           []NamedSocketAddress{},
+			AdvertisedPandaproxyAPI: []NamedSocketAddress{},
+			PandaproxyAPITLS:        []ServerTLS{},
+		},
+		Redpanda: RedpandaConfig{
+			Directory: "/var/lib/redpanda/data",
+			RPCServer: SocketAddress{
+				Address: "0.0.0.0",
+				Port:    33145,
+			},
+			KafkaApi:      defaultListeners,
+			AdminApi:      defaultAdminListeners,
+			Id:            0,
+			SeedServers:   []SeedServer{},
+			DeveloperMode: true,
+		},
+		Rpk: RpkConfig{
+			CoredumpDir: "/var/lib/redpanda/coredump",
+		},
 	}
 	return conf
 }
 
 func defaultMap() map[string]interface{} {
-	var defaultListener interface{} = map[string]interface{}{
-		"address": "0.0.0.0",
-		"port":    9092,
+	m, err := toMap(Default())
+	if err != nil {
+		panic(err)
 	}
-	var defaultListeners []interface{} = []interface{}{defaultListener}
-	var defaultAdminListener interface{} = map[string]interface{}{
-		"address": "0.0.0.0",
-		"port":    9644,
-	}
-	var defaultAdminListeners []interface{} = []interface{}{defaultAdminListener}
-	return map[string]interface{}{
-		"config_file": "/etc/redpanda/redpanda.yaml",
-		"pandaproxy":  Pandaproxy{},
-		"redpanda": map[string]interface{}{
-			"data_directory": "/var/lib/redpanda/data",
-			"rpc_server": map[string]interface{}{
-				"address": "0.0.0.0",
-				"port":    33145,
-			},
-			"kafka_api":      defaultListeners,
-			"admin":          defaultAdminListeners,
-			"node_id":        0,
-			"seed_servers":   []interface{}{},
-			"developer_mode": true,
-		},
-		"rpk": map[string]interface{}{
-			"coredump_dir": "/var/lib/redpanda/coredump",
-		},
-	}
+	return m
 }
 
 func findBackup(fs afero.Fs, dir string) (string, error) {
