@@ -50,6 +50,7 @@ You may start a new cluster with 'rpk container start'`,
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodes))
 	for _, node := range nodes {
+		n := node
 		go func(state *common.NodeState) {
 			defer wg.Done()
 			// If the node was stopped already, do nothing.
@@ -75,7 +76,7 @@ You may start a new cluster with 'rpk container start'`,
 				log.Debug(err)
 				return
 			}
-		}(node)
+		}(n)
 	}
 	wg.Wait()
 	return nil
