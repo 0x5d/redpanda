@@ -75,12 +75,13 @@ func partitionInfoRows(
 
 	nodePartitions := partitionsPerNode(topics)
 
-	idToBroker := map[int]sarama.Broker{}
+	idToBroker := map[int]*sarama.Broker{}
 	nodeIDs := []int{}
 	for _, broker := range brokers {
+		b := broker
 		if broker != nil {
-			nodeIDs = append(nodeIDs, int(broker.ID()))
-			idToBroker[int(broker.ID())] = *broker
+			nodeIDs = append(nodeIDs, int(b.ID()))
+			idToBroker[int(b.ID())] = b
 		}
 	}
 

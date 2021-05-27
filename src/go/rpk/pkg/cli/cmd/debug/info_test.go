@@ -13,6 +13,7 @@ package debug
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -168,8 +169,13 @@ power management:
 		},
 	}
 	logrus.SetLevel(logrus.DebugLevel)
+	// A lock so that if the tests are run concurrently (i.e. go test --race)
+	// logrus.SetOutput isn't called at the same time.
+	mu := sync.Mutex{}
 	for _, tt := range tests {
+		mu.Lock()
 		t.Run(tt.name, func(t *testing.T) {
+			defer mu.Unlock()
 			fs := afero.NewMemMapFs()
 			mgr := config.NewManager(fs)
 			if tt.before != nil {
