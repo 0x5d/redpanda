@@ -44,7 +44,7 @@ func DefaultConfig() *sarama.Config {
 }
 
 // Overrides the default config with the redpanda config values, such as TLS.
-func LoadConfig(tls *config.TLS, scram *config.SCRAM) (*sarama.Config, error) {
+func LoadConfig(tls *config.TLS, scram *config.SASL) (*sarama.Config, error) {
 	var err error
 	c := DefaultConfig()
 
@@ -68,7 +68,7 @@ func InitClient(brokers ...string) (sarama.Client, error) {
 
 // Initializes a client using values from the configuration when possible.
 func InitClientWithConf(
-	tls *config.TLS, scram *config.SCRAM, brokers ...string,
+	tls *config.TLS, scram *config.SASL, brokers ...string,
 ) (sarama.Client, error) {
 	c, err := LoadConfig(tls, scram)
 	if err != nil {
@@ -182,9 +182,9 @@ func RetrySend(
 }
 
 func ConfigureSASL(
-	saramaConf *sarama.Config, scram *config.SCRAM,
+	saramaConf *sarama.Config, scram *config.SASL,
 ) (*sarama.Config, error) {
-	if scram.Password == "" || scram.User == "" || scram.Type == "" {
+	if scram.Password == "" || scram.User == "" || scram.Mechanism == "" {
 		return saramaConf, nil
 	}
 
@@ -192,7 +192,7 @@ func ConfigureSASL(
 	saramaConf.Net.SASL.Handshake = true
 	saramaConf.Net.SASL.User = scram.User
 	saramaConf.Net.SASL.Password = scram.Password
-	switch scram.Type {
+	switch scram.Mechanism {
 	case sarama.SASLTypeSCRAMSHA256:
 		saramaConf.Net.SASL.SCRAMClientGeneratorFunc =
 			func() sarama.SCRAMClient {
@@ -207,7 +207,7 @@ func ConfigureSASL(
 		saramaConf.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
 	default:
 		return nil, fmt.Errorf("unrecongnized Salted Challenge Response "+
-			"Authentication Mechanism (SCRAM): '%s'.", scram.Type)
+			"Authentication Mechanism (SCRAM): '%s'.", scram.Mechanism)
 	}
 	return saramaConf, nil
 }

@@ -177,7 +177,7 @@ func CreateProducer(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
 	tlsConfig func() (*config.TLS, error),
-	authConfig func() (*config.SCRAM, error),
+	authConfig func() (*config.SASL, error),
 ) func(bool, int32) (sarama.SyncProducer, error) {
 	return func(jvmPartitioner bool, partition int32) (sarama.SyncProducer, error) {
 		conf, err := configuration()
@@ -204,7 +204,7 @@ func CreateProducer(
 			}
 			// If no SCRAM config was set, try to look for it in the
 			// config file.
-			scram = &conf.Rpk.SCRAM
+			scram = &conf.Rpk.SASL
 		}
 
 		cfg, err := kafka.LoadConfig(tls, scram)
@@ -227,7 +227,7 @@ func CreateClient(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
 	tlsConfig func() (*config.TLS, error),
-	authConfig func() (*config.SCRAM, error),
+	authConfig func() (*config.SASL, error),
 ) func() (sarama.Client, error) {
 	return func() (sarama.Client, error) {
 		conf, err := configuration()
@@ -253,7 +253,7 @@ func CreateClient(
 			}
 			// If no SCRAM config was set, try to look for it in the
 			// config file.
-			scram = &conf.Rpk.SCRAM
+			scram = &conf.Rpk.SASL
 		}
 
 		bs := brokers()
@@ -266,7 +266,7 @@ func CreateAdmin(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
 	tlsConfig func() (*config.TLS, error),
-	authConfig func() (*config.SCRAM, error),
+	authConfig func() (*config.SASL, error),
 ) func() (sarama.ClusterAdmin, error) {
 	return func() (sarama.ClusterAdmin, error) {
 		var err error
@@ -294,7 +294,7 @@ func CreateAdmin(
 			}
 			// If no SCRAM config was set, try to look for it in the
 			// config file.
-			scram = &conf.Rpk.SCRAM
+			scram = &conf.Rpk.SASL
 		}
 
 		cfg, err := kafka.LoadConfig(tls, scram)
@@ -310,8 +310,8 @@ func CreateAdmin(
 
 func KafkaAuthConfig(
 	user, password, mechanism *string,
-) func() (*config.SCRAM, error) {
-	return func() (*config.SCRAM, error) {
+) func() (*config.SASL, error) {
+	return func() (*config.SASL, error) {
 		u := *user
 		p := *password
 		m := *mechanism
@@ -345,10 +345,10 @@ func KafkaAuthConfig(
 				sarama.SASLTypeSCRAMSHA512,
 			)
 		}
-		return &config.SCRAM{
-			User:     u,
-			Password: p,
-			Type:     m,
+		return &config.SASL{
+			User:      u,
+			Password:  p,
+			Mechanism: m,
 		}, nil
 	}
 }
