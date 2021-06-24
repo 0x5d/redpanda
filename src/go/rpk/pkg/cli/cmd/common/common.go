@@ -10,6 +10,7 @@
 package common
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -18,10 +19,12 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/burdiyan/kafkautil"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cli/cmd/container/common"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/config"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/kafka"
+	vtls "github.com/vectorizedio/redpanda/src/go/rpk/pkg/tls"
 )
 
 const FeedbackMsg = `We'd love to hear about your experience with redpanda:
@@ -29,6 +32,7 @@ https://vectorized.io/feedback`
 
 const (
 	saslMechanismFlag  = "sasl-mechanism"
+	enableTLSFlag      = "tls-enabled"
 	certFileFlag       = "tls-cert"
 	keyFileFlag        = "tls-key"
 	truststoreFileFlag = "tls-truststore"
@@ -171,7 +175,7 @@ func DeduceBrokers(
 func CreateProducer(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
-	tlsConfig func() (*config.TLS, error),
+	tlsConfig func() (*tls.Config, error),
 	authConfig func() (*config.SASL, error),
 ) func(bool, int32) (sarama.SyncProducer, error) {
 	return func(jvmPartitioner bool, partition int32) (sarama.SyncProducer, error) {
@@ -183,11 +187,6 @@ func CreateProducer(
 		tls, err := tlsConfig()
 		if err != nil {
 			return nil, err
-		}
-		// If no TLS config was set, try to look for TLS config in the
-		// config file.
-		if tls == nil {
-			tls = conf.Rpk.KafkaApi.TLS
 		}
 
 		scram, err := authConfig()
@@ -221,7 +220,7 @@ func CreateProducer(
 func CreateClient(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
-	tlsConfig func() (*config.TLS, error),
+	tlsConfig func() (*tls.Config, error),
 	authConfig func() (*config.SASL, error),
 ) func() (sarama.Client, error) {
 	return func() (sarama.Client, error) {
@@ -232,11 +231,6 @@ func CreateClient(
 		tls, err := tlsConfig()
 		if err != nil {
 			return nil, err
-		}
-		// If no TLS config was set, try to look for TLS config in the
-		// config file.
-		if tls == nil {
-			tls = conf.Rpk.KafkaApi.TLS
 		}
 
 		scram, err := authConfig()
@@ -260,7 +254,7 @@ func CreateClient(
 func CreateAdmin(
 	brokers func() []string,
 	configuration func() (*config.Config, error),
-	tlsConfig func() (*config.TLS, error),
+	tlsConfig func() (*tls.Config, error),
 	authConfig func() (*config.SASL, error),
 ) func() (sarama.ClusterAdmin, error) {
 	return func() (sarama.ClusterAdmin, error) {
@@ -273,11 +267,6 @@ func CreateAdmin(
 		tls, err := tlsConfig()
 		if err != nil {
 			return nil, err
-		}
-		// If no TLS config was set, try to look for TLS config in the
-		// config file.
-		if tls == nil {
-			tls = conf.Rpk.KafkaApi.TLS
 		}
 
 		scram, err := authConfig()
@@ -349,10 +338,12 @@ func KafkaAuthConfig(
 }
 
 func BuildAdminApiTLSConfig(
+	fs afero.Fs,
+	enableTLS *bool,
 	certFile, keyFile, truststoreFile *string,
 	configuration func() (*config.Config, error),
-) func() (*config.TLS, error) {
-	return func() (*config.TLS, error) {
+) func() (*tls.Config, error) {
+	return func() (*tls.Config, error) {
 		defaultVal := func() (*config.TLS, error) {
 			conf, err := configuration()
 			if err != nil {
@@ -361,6 +352,8 @@ func BuildAdminApiTLSConfig(
 			return conf.Rpk.AdminApi.TLS, nil
 		}
 		return buildTLS(
+			fs,
+			enableTLS,
 			certFile,
 			keyFile,
 			truststoreFile,
@@ -373,10 +366,12 @@ func BuildAdminApiTLSConfig(
 }
 
 func BuildKafkaTLSConfig(
+	fs afero.Fs,
+	enableTLS *bool,
 	certFile, keyFile, truststoreFile *string,
 	configuration func() (*config.Config, error),
-) func() (*config.TLS, error) {
-	return func() (*config.TLS, error) {
+) func() (*tls.Config, error) {
+	return func() (*tls.Config, error) {
 		defaultVal := func() (*config.TLS, error) {
 			conf, err := configuration()
 			if err != nil {
@@ -385,6 +380,8 @@ func BuildKafkaTLSConfig(
 			return conf.Rpk.KafkaApi.TLS, nil
 		}
 		return buildTLS(
+			fs,
+			enableTLS,
 			certFile,
 			keyFile,
 			truststoreFile,
@@ -402,12 +399,15 @@ func BuildKafkaTLSConfig(
 // If after that no value is found for any of them, the result of calling
 // defaultVal is returned.
 func buildTLS(
+	fs afero.Fs,
+	enableTLS *bool,
 	certFile, keyFile, truststoreFile *string,
 	certEnvVar, keyEnvVar, truststoreEnvVar string,
 	defaultVal func() (*config.TLS, error),
-) (*config.TLS, error) {
+) (*tls.Config, error) {
 	// Give priority to building the TLS config with args that were passed
 	// directly or as env vars.
+	enable := *enableTLS
 	c := *certFile
 	k := *keyFile
 	t := *truststoreFile
@@ -424,36 +424,23 @@ func buildTLS(
 	if t == "" && c == "" && k == "" {
 		// If the values weren't set with flags nor env vars,
 		// return the TLS config for the Admin API from the config
-		return defaultVal()
+		defaultTLS, err := defaultVal()
+		if err != nil {
+			return nil, err
+		}
+		if defaultTLS != nil {
+			c = defaultTLS.CertFile
+			k = defaultTLS.KeyFile
+			t = defaultTLS.TruststoreFile
+		}
 	}
-	if t == "" && (c != "" || k != "") {
-		return nil, fmt.Errorf(
-			"--%s is required to enable TLS",
-			truststoreFileFlag,
-		)
-	}
-	if c != "" && k == "" {
-		return nil, fmt.Errorf(
-			"if --%s is passed, then --%s must be passed to enable"+
-				" TLS authentication",
-			certFileFlag,
-			keyFileFlag,
-		)
-	}
-	if k != "" && c == "" {
-		return nil, fmt.Errorf(
-			"if --%s is passed, then --%s must be passed to enable"+
-				" TLS authentication",
-			keyFileFlag,
-			certFileFlag,
-		)
-	}
-	tls := &config.TLS{
-		KeyFile:        k,
-		CertFile:       c,
-		TruststoreFile: t,
-	}
-	return tls, nil
+	return vtls.BuildTLSConfig(
+		fs,
+		enable,
+		c,
+		k,
+		t,
+	)
 }
 
 func CreateDockerClient() (common.Client, error) {
@@ -485,7 +472,9 @@ func ContainerBrokers(c common.Client) ([]string, []string) {
 
 func AddKafkaFlags(
 	command *cobra.Command,
-	configFile, user, password, saslMechanism, certFile, keyFile, truststoreFile *string,
+	configFile, user, password, saslMechanism *string,
+	enableTLS *bool,
+	certFile, keyFile, truststoreFile *string,
 	brokers *[]string,
 ) *cobra.Command {
 	command.PersistentFlags().StringSliceVar(
@@ -527,16 +516,24 @@ func AddKafkaFlags(
 		),
 	)
 
-	AddTLSFlags(command, certFile, keyFile, truststoreFile)
+	AddTLSFlags(command, enableTLS, certFile, keyFile, truststoreFile)
 
 	return command
 }
 
 func AddTLSFlags(
-	command *cobra.Command, certFile,
+	command *cobra.Command,
+	enableTLS *bool,
+	certFile,
 	keyFile,
 	truststoreFile *string,
 ) *cobra.Command {
+	command.PersistentFlags().BoolVar(
+		enableTLS,
+		enableTLSFlag,
+		false,
+		"Enable TLS",
+	)
 	command.PersistentFlags().StringVar(
 		certFile,
 		certFileFlag,

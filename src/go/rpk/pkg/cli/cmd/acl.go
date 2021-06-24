@@ -24,6 +24,7 @@ func NewACLCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		user           string
 		password       string
 		mechanism      string
+		enableTLS      bool
 		certFile       string
 		keyFile        string
 		truststoreFile string
@@ -40,6 +41,7 @@ func NewACLCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		&user,
 		&password,
 		&mechanism,
+		&enableTLS,
 		&certFile,
 		&keyFile,
 		&truststoreFile,
@@ -52,8 +54,8 @@ func NewACLCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
 		configClosure,
 		&brokers,
 	)
-	kafkaTlsClosure := common.BuildKafkaTLSConfig(&certFile, &keyFile, &truststoreFile, configClosure)
-	adminTlsClosure := common.BuildAdminApiTLSConfig(&certFile, &keyFile, &truststoreFile, configClosure)
+	kafkaTlsClosure := common.BuildKafkaTLSConfig(fs, &enableTLS, &certFile, &keyFile, &truststoreFile, configClosure)
+	adminTlsClosure := common.BuildAdminApiTLSConfig(fs, &enableTLS, &certFile, &keyFile, &truststoreFile, configClosure)
 	kAuthClosure := common.KafkaAuthConfig(&user, &password, &mechanism)
 	adminClosure := common.CreateAdmin(brokersClosure, configClosure, kafkaTlsClosure, kAuthClosure)
 
