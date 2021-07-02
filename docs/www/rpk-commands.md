@@ -528,3 +528,16 @@ Flags:
       --send rpk debug info   Tells `rpk debug info` whether to send the gathered resource usage data to Vectorized
       --timeout duration      The maximum amount of time to wait for the metrics to be gathered. The value passed is a sequence of decimal numbers, each with optional fraction and a unit suffix, such as '300ms', '1.5s' or '2h45m'. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h' (default: 2s)
 ```
+
+### debug ballast
+
+Create a "ballast" file which can be removed later to free disk space.
+
+```cmd
+Usage:
+  rpk debug ballast [flags]
+
+Flags:
+      --path string   The filepath where the ballast file will be created. (default "/var/lib/redpanda/data/ballast.txt")
+      --size string   The size of the ballast file, e.g. 1GiB, 1024KiB, 3GB. (default "1.074GB")
+```

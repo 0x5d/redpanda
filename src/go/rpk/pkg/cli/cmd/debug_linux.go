@@ -10,19 +10,10 @@
 package cmd
 
 import (
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/cli/cmd/debug"
-	"github.com/vectorizedio/redpanda/src/go/rpk/pkg/config"
 )
 
-func NewDebugCommand(fs afero.Fs, mgr config.Manager) *cobra.Command {
-	command := &cobra.Command{
-		Use:   "debug",
-		Short: "Debug the local Redpanda process",
-	}
-	command.AddCommand(debug.NewInfoCommand(fs, mgr))
-	addDebugPlatformDependentCmds(command)
-
-	return command
+func addDebugPlatformDependentCmds(command *cobra.Command) {
+	command.AddCommand(debug.NewBallastCommand())
 }
